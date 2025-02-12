@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f7f7f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <title>WordStacks</title>
+  <style>
+    :root {
+      --background: #f7f7f7;
+      --text: #4a4a4a;
+      --accent: #8bc34a;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--background);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      text-align: center;
+      padding: 20px;
+      background: var(--accent);
+      color: white;
+    }
+
+    main {
+      width: 90%;
+      max-width: 600px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      padding: 20px;
+    }
+
+    .card input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .card button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+
+    .card button:hover {
+      background: #7cb342;
+    }
+
+    footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WordStacks</h1>
+  </header>
+  <main>
+    <div id="app">
+      <div class="card">
+        <h2>Create a Card</h2>
+        <input type="text" id="germanWord" placeholder="German Word" />
+        <input type="text" id="russianWord" placeholder="Russian Word" />
+        <button onclick="addCard()">Add Card</button>
+      </div>
+      <div class="card">
+        <h2>Scan Text</h2>
+        <button onclick="scanText()">Scan Photo</button>
+      </div>
+      <div class="card">
+        <h2>Import from File</h2>
+        <button onclick="importFromFile()">Import</button>
+      </div>
+      <div class="card">
+        <h2>Word List</h2>
+        <ul id="wordList"></ul>
+      </div>
+    </div>
+  </main>
+  <footer>
+    &copy; 2023 WordStacks
+  </footer>
+
+  <script>
+    const dbPromise = idb.openDB('wordStackDB', 1, {
+      upgrade(db) {
+        db.createObjectStore('cards', { keyPath: 'id', autoIncrement: true });
+      }
+    });
+
+    async function addCard() {
+      const germanWord = document.getElementById('germanWord').value.trim();
+      const russianWord = document.getElementById('russianWord').value.trim();
+
+      if (!germanWord || !russianWord) return;
+
+      const existingCards = await getCards();
+      const isDuplicate = existingCards.some(
+        card => card.german === germanWord && card.russian === russianWord
+      );
+
+      if (isDuplicate) {
+        alert('This word pair already exists!');
+        return;
+      }
+
+      const newCard = { german: germanWord, russian: russianWord };
+      await saveCard(newCard);
+      renderWordList();
+      document.getElementById('germanWord').value = '';
+      document.getElementById('russianWord').value = '';
+    }
+
+    async function saveCard(card) {
+      const db = await dbPromise;
+      await db.put('cards', card);
+    }
+
+    async function getCards() {
+      const db = await dbPromise;
+      return await db.getAll('cards');
+    }
+
+    async function renderWordList() {
+      const wordListElement = document.getElementById('wordList');
+      const cards = await getCards();
+      wordListElement.innerHTML = '';
+      cards.forEach(card => {
+        const li = document.createElement('li');
+        li.textContent = `${card.german} - ${card.russian}`;
+        wordListElement.appendChild(li);
+      });
+    }
+
+    async function scanText() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Camera access is not supported.');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+
+      setTimeout(() => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        stream.getTracks().forEach(track => track.stop());
+
+        recognizeText(canvas.toDataURL('image/png')).then(text => {
+          alert(`Detected text: ${text}`);
+          // Add logic to create cards from detected text
+        });
+      }, 1000);
+    }
+
+    async function recognizeText(imageData) {
+      try {
+        const detector = new TextDetector();
+        const response = await fetch(imageData);
+        const blob = await response.blob();
+        const text = await detector.detect(blob);
+        return Array.from(text).map(({ value }) => value).join(' ');
+      } catch (error) {
+        console.error('Text recognition failed:', error);
+        return '';
+      }
+    }
+
+    async function importFromFile() {
+      const [handle] = await window.showOpenFilePicker();
+      const file = await handle.getFile();
+      const contents = await file.text();
+      const words = JSON.parse(contents);
+
+      for (const word of words) {
+        await saveCard(word);
+      }
+
+      renderWordList();
+    }
+
+    renderWordList();
+  </script>
+</body>
+</html>
