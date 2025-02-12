@@ -46,27 +46,28 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       margin-bottom: 20px;
       padding: 20px;
-    }
-
-    .card input {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-
-    .card button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 4px;
-      background: var(--accent);
-      color: white;
       cursor: pointer;
+      transition: transform 0.2s ease;
     }
 
-    .card button:hover {
-      background: #7cb342;
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .card.revealed .translation {
+      display: block;
+    }
+
+    .card .word {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .card .translation {
+      font-size: 16px;
+      color: var(--accent);
+      display: none;
+      margin-top: 10px;
     }
 
     footer {
@@ -98,7 +99,7 @@
       </div>
       <div class="card">
         <h2>Word List</h2>
-        <ul id="wordList"></ul>
+        <div id="wordList"></div>
       </div>
     </div>
   </main>
@@ -149,11 +150,29 @@
     async function renderWordList() {
       const wordListElement = document.getElementById('wordList');
       const cards = await getCards();
-      wordListElement.innerHTML = '';
+      wordListElement.innerHTML = ''; // Clear previous cards
+
       cards.forEach(card => {
-        const li = document.createElement('li');
-        li.textContent = `${card.german} - ${card.russian}`;
-        wordListElement.appendChild(li);
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card';
+        cardDiv.dataset.id = card.id;
+
+        const wordElement = document.createElement('div');
+        wordElement.className = 'word';
+        wordElement.textContent = card.german;
+
+        const translationElement = document.createElement('div');
+        translationElement.className = 'translation';
+        translationElement.textContent = card.russian;
+
+        cardDiv.appendChild(wordElement);
+        cardDiv.appendChild(translationElement);
+
+        cardDiv.addEventListener('click', () => {
+          cardDiv.classList.toggle('revealed');
+        });
+
+        wordListElement.appendChild(cardDiv);
       });
     }
 
