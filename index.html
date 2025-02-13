@@ -118,7 +118,10 @@
       const germanWord = document.getElementById('germanWord').value.trim();
       const russianWord = document.getElementById('russianWord').value.trim();
 
-      if (!germanWord || !russianWord) return;
+      if (!germanWord || !russianWord) {
+        alert('Please enter both German and Russian words.');
+        return;
+      }
 
       const existingCards = await getCards();
       const isDuplicate = existingCards.some(
@@ -140,11 +143,14 @@
     async function saveCard(card) {
       const db = await dbPromise;
       await db.put('cards', card);
+      console.log('Card saved:', card);
     }
 
     async function getCards() {
       const db = await dbPromise;
-      return await db.getAll('cards');
+      const cards = await db.getAll('cards');
+      console.log('Retrieved cards:', cards);
+      return cards;
     }
 
     async function renderWordList() {
@@ -170,6 +176,7 @@
 
         cardDiv.addEventListener('click', () => {
           cardDiv.classList.toggle('revealed');
+          console.log(`Toggled card with ID ${card.id}`);
         });
 
         wordListElement.appendChild(cardDiv);
@@ -199,6 +206,8 @@
         recognizeText(canvas.toDataURL('image/png')).then(text => {
           alert(`Detected text: ${text}`);
           // Add logic to create cards from detected text
+        }).catch(err => {
+          console.error('Error during text recognition:', err);
         });
       }, 1000);
     }
@@ -209,6 +218,7 @@
         const response = await fetch(imageData);
         const blob = await response.blob();
         const text = await detector.detect(blob);
+        console.log('Detected text:', text);
         return Array.from(text).map(({ value }) => value).join(' ');
       } catch (error) {
         console.error('Text recognition failed:', error);
@@ -217,16 +227,20 @@
     }
 
     async function importFromFile() {
-      const [handle] = await window.showOpenFilePicker();
-      const file = await handle.getFile();
-      const contents = await file.text();
-      const words = JSON.parse(contents);
+      try {
+        const [handle] = await window.showOpenFilePicker();
+        const file = await handle.getFile();
+        const contents = await file.text();
+        const words = JSON.parse(contents);
 
-      for (const word of words) {
-        await saveCard(word);
+        for (const word of words) {
+          await saveCard(word);
+        }
+
+        renderWordList();
+      } catch (err) {
+        console.error('Error importing file:', err);
       }
-
-      renderWordList();
     }
 
     renderWordList();
