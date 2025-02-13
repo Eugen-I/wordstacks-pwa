@@ -245,13 +245,26 @@
 
           alert(`Detected text: ${text}`);
 
-          // Example: Split detected text into pairs and add as cards
+          // Process detected text into word pairs
           const lines = text.split('\n').filter(line => line.trim() !== '');
+          let pairs = [];
+
           for (let i = 0; i < lines.length - 1; i += 2) {
             const german = lines[i].trim();
             const russian = lines[i + 1].trim();
-            const newCard = { german, russian };
-            await saveCard(newCard);
+            if (german && russian) {
+              pairs.push({ german, russian });
+            }
+          }
+
+          if (pairs.length === 0) {
+            alert('No valid word pairs detected.');
+            return;
+          }
+
+          // Save detected pairs as cards
+          for (const pair of pairs) {
+            await saveCard(pair);
           }
 
           // Re-render the word list
@@ -277,14 +290,27 @@
         }
 
         const contents = await file.text();
-        const words = JSON.parse(contents);
 
-        for (const word of words) {
-          await saveCard(word);
+        try {
+          const words = JSON.parse(contents);
+
+          if (!Array.isArray(words)) {
+            throw new Error('Invalid JSON format. Expected an array of word pairs.');
+          }
+
+          for (const word of words) {
+            if (!word.german || !word.russian) {
+              throw new Error('Each word pair must have "german" and "russian" fields.');
+            }
+            await saveCard(word);
+          }
+
+          // Re-render the word list
+          renderWordList();
+        } catch (err) {
+          console.error('Error parsing JSON file:', err);
+          alert('Failed to parse the JSON file. Please ensure it has the correct format.');
         }
-
-        // Re-render the word list
-        renderWordList();
       } catch (err) {
         console.error('Error importing file:', err);
         alert('Failed to import the file.');
