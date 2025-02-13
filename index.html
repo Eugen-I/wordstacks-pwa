@@ -107,111 +107,145 @@
     &copy; 2023 WordStacks
   </footer>
 
+  <!-- Include IndexedDB library -->
+  <script src="https://unpkg.com/idb@7.0.2/build/index.cjs"></script>
+
   <script>
+    // Initialize IndexedDB
     const dbPromise = idb.openDB('wordStackDB', 1, {
       upgrade(db) {
         db.createObjectStore('cards', { keyPath: 'id', autoIncrement: true });
       }
     });
 
+    // Add a card to the database
     async function addCard() {
-      const germanWord = document.getElementById('germanWord').value.trim();
-      const russianWord = document.getElementById('russianWord').value.trim();
+      try {
+        const germanWord = document.getElementById('germanWord').value.trim();
+        const russianWord = document.getElementById('russianWord').value.trim();
 
-      if (!germanWord || !russianWord) {
-        alert('Please enter both German and Russian words.');
-        return;
+        if (!germanWord || !russianWord) {
+          alert('Please enter both German and Russian words.');
+          return;
+        }
+
+        const existingCards = await getCards();
+        const isDuplicate = existingCards.some(
+          card => card.german === germanWord && card.russian === russianWord
+        );
+
+        if (isDuplicate) {
+          alert('This word pair already exists!');
+          return;
+        }
+
+        const newCard = { german: germanWord, russian: russianWord };
+        await saveCard(newCard);
+        renderWordList();
+        document.getElementById('germanWord').value = '';
+        document.getElementById('russianWord').value = '';
+      } catch (error) {
+        console.error('Error adding card:', error);
+        alert('An error occurred while adding the card.');
       }
-
-      const existingCards = await getCards();
-      const isDuplicate = existingCards.some(
-        card => card.german === germanWord && card.russian === russianWord
-      );
-
-      if (isDuplicate) {
-        alert('This word pair already exists!');
-        return;
-      }
-
-      const newCard = { german: germanWord, russian: russianWord };
-      await saveCard(newCard);
-      renderWordList();
-      document.getElementById('germanWord').value = '';
-      document.getElementById('russianWord').value = '';
     }
 
+    // Save a card to IndexedDB
     async function saveCard(card) {
-      const db = await dbPromise;
-      await db.put('cards', card);
-      console.log('Card saved:', card);
-    }
-
-    async function getCards() {
-      const db = await dbPromise;
-      const cards = await db.getAll('cards');
-      console.log('Retrieved cards:', cards);
-      return cards;
-    }
-
-    async function renderWordList() {
-      const wordListElement = document.getElementById('wordList');
-      const cards = await getCards();
-      wordListElement.innerHTML = ''; // Clear previous cards
-
-      cards.forEach(card => {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card';
-        cardDiv.dataset.id = card.id;
-
-        const wordElement = document.createElement('div');
-        wordElement.className = 'word';
-        wordElement.textContent = card.german;
-
-        const translationElement = document.createElement('div');
-        translationElement.className = 'translation';
-        translationElement.textContent = card.russian;
-
-        cardDiv.appendChild(wordElement);
-        cardDiv.appendChild(translationElement);
-
-        cardDiv.addEventListener('click', () => {
-          cardDiv.classList.toggle('revealed');
-          console.log(`Toggled card with ID ${card.id}`);
-        });
-
-        wordListElement.appendChild(cardDiv);
-      });
-    }
-
-    async function scanText() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Camera access is not supported.');
-        return;
+      try {
+        const db = await dbPromise;
+        await db.put('cards', card);
+        console.log('Card saved:', card);
+      } catch (error) {
+        console.error('Error saving card:', error);
       }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.play();
-
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      setTimeout(() => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        stream.getTracks().forEach(track => track.stop());
-
-        recognizeText(canvas.toDataURL('image/png')).then(text => {
-          alert(`Detected text: ${text}`);
-          // Add logic to create cards from detected text
-        }).catch(err => {
-          console.error('Error during text recognition:', err);
-        });
-      }, 1000);
     }
 
+    // Retrieve all cards from IndexedDB
+    async function getCards() {
+      try {
+        const db = await dbPromise;
+        const cards = await db.getAll('cards');
+        console.log('Retrieved cards:', cards);
+        return cards;
+      } catch (error) {
+        console.error('Error retrieving cards:', error);
+        return [];
+      }
+    }
+
+    // Render the word list
+    async function renderWordList() {
+      try {
+        const wordListElement = document.getElementById('wordList');
+        const cards = await getCards();
+        wordListElement.innerHTML = ''; // Clear previous cards
+
+        cards.forEach(card => {
+          const cardDiv = document.createElement('div');
+          cardDiv.className = 'card';
+          cardDiv.dataset.id = card.id;
+
+          const wordElement = document.createElement('div');
+          wordElement.className = 'word';
+          wordElement.textContent = card.german;
+
+          const translationElement = document.createElement('div');
+          translationElement.className = 'translation';
+          translationElement.textContent = card.russian;
+
+          cardDiv.appendChild(wordElement);
+          cardDiv.appendChild(translationElement);
+
+          cardDiv.addEventListener('click', () => {
+            cardDiv.classList.toggle('revealed');
+            console.log(`Toggled card with ID ${card.id}`);
+          });
+
+          wordListElement.appendChild(cardDiv);
+        });
+      } catch (error) {
+        console.error('Error rendering word list:', error);
+      }
+    }
+
+    // Scan text from a photo
+    async function scanText() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Camera access is not supported.');
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        setTimeout(() => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          stream.getTracks().forEach(track => track.stop());
+
+          recognizeText(canvas.toDataURL('image/png')).then(text => {
+            alert(`Detected text: ${text}`);
+            // Add logic to create cards from detected text
+          }).catch(err => {
+            console.error('Error during text recognition:', err);
+            alert('Text recognition failed.');
+          });
+        }, 1000);
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        alert('Failed to access the camera.');
+      }
+    }
+
+    // Recognize text from an image
     async function recognizeText(imageData) {
       try {
         const detector = new TextDetector();
@@ -226,6 +260,7 @@
       }
     }
 
+    // Import words from a file
     async function importFromFile() {
       try {
         const [handle] = await window.showOpenFilePicker();
@@ -240,9 +275,11 @@
         renderWordList();
       } catch (err) {
         console.error('Error importing file:', err);
+        alert('Failed to import the file.');
       }
     }
 
+    // Initialize the app
     renderWordList();
   </script>
 </body>
